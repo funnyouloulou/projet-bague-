@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { createOrder } from "@/lib/orders";
 import { nanoid } from "nanoid";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "placeholder");
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return NextResponse.json({ error: "Non configuré" }, { status: 503 });
+  const Stripe = (await import("stripe")).default;
+  const stripe = new Stripe(key);
   const body = await req.text();
   const sig = req.headers.get("stripe-signature")!;
 

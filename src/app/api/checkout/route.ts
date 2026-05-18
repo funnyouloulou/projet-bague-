@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
 import { PRODUCT } from "@/data/product";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "placeholder");
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    return NextResponse.json({ error: "Paiement non configuré" }, { status: 503 });
+  }
+
+  const Stripe = (await import("stripe")).default;
+  const stripe = new Stripe(key);
+
   try {
     const body = await req.json();
-    const { size } = body;
+    const { size, productName, price } = body;
 
     if (!size) {
       return NextResponse.json({ error: "Taille manquante" }, { status: 400 });
@@ -16,29 +24,22 @@ export async function POST(req: NextRequest) {
       payment_method_types: ["card"],
       mode: "payment",
       locale: "fr",
-
       line_items: [
         {
           price_data: {
             currency: "eur",
             product_data: {
-              name: PRODUCT.name,
-              description: `${PRODUCT.subtitle} — Taille ${size}`,
-              // Remplacez par une vraie image une fois que vous en avez
-              // images: ["https://votre-site.com/images/ring-1.jpg"],
+              name: productName ?? PRODUCT.name,
+              description: `Taille ${size}`,
             },
-            unit_amount: Math.round(PRODUCT.price * 100), // en centimes
+            unit_amount: Math.round((price ?? PRODUCT.price) * 100),
           },
           quantity: 1,
         },
       ],
-
-      // Collecte l'adresse de livraison du client
       shipping_address_collection: {
         allowed_countries: ["FR", "BE", "CH", "LU", "MC"],
       },
-
-      // Frais de livraison offerts
       shipping_options: [
         {
           shipping_rate_data: {
@@ -52,16 +53,9 @@ export async function POST(req: NextRequest) {
           },
         },
       ],
-
-      // Métadonnées pour retrouver la taille dans le webhook
-      metadata: {
-        size,
-        productName: PRODUCT.name,
-      },
-
-      // Pages de redirection
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/merci?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/#buy`,
+      metadata: { size, productName: productName ?? PRODUCT.name },
+      success_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/merci?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/#collection`,
     });
 
     return NextResponse.json({ url: session.url });
