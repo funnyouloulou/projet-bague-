@@ -3,9 +3,8 @@ import Stripe from "stripe";
 import { createOrder } from "@/lib/orders";
 import { nanoid } from "nanoid";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 export async function POST(req: NextRequest) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "placeholder");
   const body = await req.text();
   const sig = req.headers.get("stripe-signature")!;
 
@@ -55,7 +54,3 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ received: true });
 }
 
-// Stripe envoie les webhooks en raw body — important
-export const config = {
-  api: { bodyParser: false },
-};
