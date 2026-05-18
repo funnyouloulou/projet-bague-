@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PRODUCT } from "@/data/product";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) {
-    return NextResponse.json({ error: "Paiement non configuré" }, { status: 503 });
+    return NextResponse.json(
+      { error: "Paiement non encore configuré. Revenez bientôt !" },
+      { status: 503 }
+    );
   }
-
-  const Stripe = (await import("stripe")).default;
-  const stripe = new Stripe(key);
 
   try {
     const body = await req.json();
@@ -20,42 +19,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Taille manquante" }, { status: 400 });
     }
 
+    // Import dynamique pour éviter l'évaluation au build
+    const { default: Stripe } = await import("stripe");
+    const stripe = new Stripe(key);
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
       locale: "fr",
-      line_items: [
-        {
-          price_data: {
-            currency: "eur",
-            product_data: {
-              name: productName ?? PRODUCT.name,
-              description: `Taille ${size}`,
-            },
-            unit_amount: Math.round((price ?? PRODUCT.price) * 100),
-          },
-          quantity: 1,
+      line_items: [{
+        price_data: {
+          currency: "eur",
+          product_data: { name: productName ?? "Bijou AURUM", description: `Taille ${size}` },
+          unit_amount: Math.round((price ?? 0) * 100),
         },
-      ],
-      shipping_address_collection: {
-        allowed_countries: ["FR", "BE", "CH", "LU", "MC"],
-      },
-      shipping_options: [
-        {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: { amount: 0, currency: "eur" },
-            display_name: "Livraison offerte",
-            delivery_estimate: {
-              minimum: { unit: "business_day", value: 7 },
-              maximum: { unit: "business_day", value: 14 },
-            },
+        quantity: 1,
+      }],
+      shipping_address_collection: { allowed_countries: ["FR", "BE", "CH", "LU", "MC"] },
+      shipping_options: [{
+        shipping_rate_data: {
+          type: "fixed_amount",
+          fixed_amount: { amount: 0, currency: "eur" },
+          display_name: "Livraison offerte",
+          delivery_estimate: {
+            minimum: { unit: "business_day", value: 7 },
+            maximum: { unit: "business_day", value: 14 },
           },
         },
-      ],
-      metadata: { size, productName: productName ?? PRODUCT.name },
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/merci?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/#collection`,
+      }],
+      metadata: { size, productName: productName ?? "" },
+      success_url: `${siteUrl}/merci?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/#collection`,
     });
 
     return NextResponse.json({ url: session.url });
