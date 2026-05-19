@@ -32,14 +32,14 @@ export async function POST(req: NextRequest) {
       locale: "fr",
       line_items: items.map((item) => ({
         price_data: {
-          currency: item.currency ?? "eur",
+          currency: "eur",
           product_data: {
             name: item.productName,
             description: item.size ? `Taille ${item.size}` : undefined,
           },
           unit_amount: Math.round(item.price * 100),
         },
-        quantity: item.quantity,
+        quantity: item.quantity ?? 1,
       })),
       shipping_address_collection: { allowed_countries: ["FR", "BE", "CH", "LU", "MC"] },
       shipping_options: [{
