@@ -13,13 +13,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { size, productName, price } = body;
+    const { items } = body as {
+      items: { productName: string; size: string; price: number; currency: string; quantity: number }[];
+    };
 
-    if (!size) {
-      return NextResponse.json({ error: "Taille manquante" }, { status: 400 });
+    if (!items || items.length === 0) {
+      return NextResponse.json({ error: "Panier vide" }, { status: 400 });
     }
 
-    // Import dynamique pour éviter l'évaluation au build
     const { default: Stripe } = await import("stripe");
     const stripe = new Stripe(key);
 
@@ -29,14 +30,17 @@ export async function POST(req: NextRequest) {
       payment_method_types: ["card"],
       mode: "payment",
       locale: "fr",
-      line_items: [{
+      line_items: items.map((item) => ({
         price_data: {
-          currency: "eur",
-          product_data: { name: productName ?? "Bijou AURUM", description: `Taille ${size}` },
-          unit_amount: Math.round((price ?? 0) * 100),
+          currency: item.currency ?? "eur",
+          product_data: {
+            name: item.productName,
+            description: item.size ? `Taille ${item.size}` : undefined,
+          },
+          unit_amount: Math.round(item.price * 100),
         },
-        quantity: 1,
-      }],
+        quantity: item.quantity,
+      })),
       shipping_address_collection: { allowed_countries: ["FR", "BE", "CH", "LU", "MC"] },
       shipping_options: [{
         shipping_rate_data: {
@@ -49,7 +53,10 @@ export async function POST(req: NextRequest) {
           },
         },
       }],
-      metadata: { size, productName: productName ?? "" },
+      metadata: {
+        productName: items.map((i) => i.productName).join(", "),
+        size: items.map((i) => i.size).join(", "),
+      },
       success_url: `${siteUrl}/merci?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/#collection`,
     });

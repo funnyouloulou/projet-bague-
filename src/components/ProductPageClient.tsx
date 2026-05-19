@@ -5,6 +5,7 @@ import { ShoppingBag, Star, Users, Eye, Check, Loader2, Shield, Sparkles, Ruler,
 import Link from "next/link";
 import type { Product } from "@/data/products";
 import ProductCarouselGeneric from "./ProductCarouselGeneric";
+import { useCart } from "@/context/CartContext";
 
 function SizeGuideModal({ onClose }: { onClose: () => void }) {
   return (
@@ -55,6 +56,7 @@ export default function ProductPageClient({ product }: { product: Product }) {
   const [loading, setLoading] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
+  const { addItem } = useCart();
 
   const discount = Math.round(
     ((product.originalPrice - product.price) / product.originalPrice) * 100
@@ -70,7 +72,17 @@ export default function ProductPageClient({ product }: { product: Product }) {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ size: selectedSize, productSlug: product.slug, productName: product.name, price: product.price }),
+        body: JSON.stringify({
+          items: [{
+            productSlug: product.slug,
+            productName: product.name,
+            size: selectedSize,
+            price: product.price,
+            currency: product.currency,
+            image: product.images[0].src,
+            quantity: 1,
+          }],
+        }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -84,6 +96,14 @@ export default function ProductPageClient({ product }: { product: Product }) {
 
   const handleAddToCart = () => {
     if (!selectedSize) { alert("Veuillez sélectionner une taille."); return; }
+    addItem({
+      productSlug: product.slug,
+      productName: product.name,
+      size: selectedSize,
+      price: product.price,
+      currency: product.currency,
+      image: product.images[0].src,
+    });
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2500);
   };
